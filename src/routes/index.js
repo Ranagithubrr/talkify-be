@@ -5,9 +5,6 @@ const authRoutes = require('./auth');
 function routes() {
   const router = Router();
 
-  router.get('/', () => {
-    res.send('running');
-  });
   router.use('/sample', sampleRoutes);
   router.use('/auth', authRoutes);
 
