@@ -1,12 +1,12 @@
 const { Router } = require('express');
-const sampleRoutes = require('./sample');
 const authRoutes = require('./auth');
+const messageRoutes = require('./message');
 
 function routes() {
   const router = Router();
 
-  router.use('/sample', sampleRoutes);
   router.use('/auth', authRoutes);
+  router.use('/messages', messageRoutes);
 
   return router;
 }
