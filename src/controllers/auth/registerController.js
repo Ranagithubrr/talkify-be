@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const User = require('../../models/User');
 const { isValidEmail, isValidPassword } = require('../../utils/validators');
+const { signAccessToken, signRefreshToken } = require('../../utils/tokens');
 
 async function register(req, res, next) {
   try {
@@ -32,6 +33,9 @@ async function register(req, res, next) {
       photo: photo || null,
     });
 
+    const accessToken = signAccessToken(user);
+    const refreshToken = signRefreshToken(user);
+
     return res.status(201).json({
       user: {
         id: user._id,
@@ -39,6 +43,10 @@ async function register(req, res, next) {
         email: user.email,
         photo: user.photo,
         createdAt: user.createdAt,
+      },
+      tokens: {
+        accessToken,
+        refreshToken,
       },
     });
   } catch (err) {
