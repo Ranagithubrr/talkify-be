@@ -11,6 +11,10 @@ function createApp() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 
+  app.get('/', (req, res) => {
+    res.send('api is running')
+  })
+
   app.use('/api', routes());
 
   app.get('/health', (req, res) => {
