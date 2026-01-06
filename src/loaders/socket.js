@@ -10,10 +10,20 @@ function setupSocket(server) {
     },
   });
 
+  const activeCounts = new Map(); // userId -> connection count
+
+  const broadcastActiveUsers = () => {
+    const users = Array.from(activeCounts.keys());
+    io.emit('active:users', users);
+  };
+
   io.on('connection', (socket) => {
     const { userId } = socket.handshake.query;
     if (userId && isValidObjectId(userId)) {
       socket.join(userId);
+      const current = activeCounts.get(userId) || 0;
+      activeCounts.set(userId, current + 1);
+      broadcastActiveUsers();
     }
 
     socket.on('message:send', async (payload, ack) => {
@@ -57,6 +67,18 @@ function setupSocket(server) {
       } catch (err) {
         console.error('Socket message error', err);
         if (ack) ack({ ok: false, error: 'Internal error' });
+      }
+    });
+
+    socket.on('disconnect', () => {
+      if (userId && isValidObjectId(userId) && activeCounts.has(userId)) {
+        const next = (activeCounts.get(userId) || 1) - 1;
+        if (next <= 0) {
+          activeCounts.delete(userId);
+        } else {
+          activeCounts.set(userId, next);
+        }
+        broadcastActiveUsers();
       }
     });
   });
