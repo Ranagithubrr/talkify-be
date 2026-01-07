@@ -240,6 +240,29 @@ const swaggerSpec = {
         },
       },
     },
+    '/api/users': {
+      get: {
+        summary: 'List all users',
+        responses: {
+          200: {
+            description: 'Users list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    users: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     schemas: {
