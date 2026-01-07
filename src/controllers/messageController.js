@@ -1,5 +1,10 @@
 const Message = require('../models/Message');
+const Conversation = require('../models/Conversation');
 const { isValidObjectId } = require('mongoose');
+
+function normalizeMembers(senderId, recipientId) {
+  return [senderId.toString(), recipientId.toString()].sort();
+}
 
 async function sendMessage(req, res, next) {
   try {
@@ -23,6 +28,19 @@ async function sendMessage(req, res, next) {
       recipient: recipientId,
       content: trimmedContent,
     });
+
+    const members = normalizeMembers(senderId, recipientId);
+    await Conversation.findOneAndUpdate(
+      { members },
+      {
+        $set: {
+          lastMessage: message._id,
+          lastMessageAt: message.sentAt,
+        },
+        $setOnInsert: { members },
+      },
+      { upsert: true }
+    );
 
     return res.status(201).json({
       message: {

@@ -1,7 +1,12 @@
 const { Server } = require('socket.io');
 const { isValidObjectId } = require('mongoose');
 const Message = require('../models/Message');
+const Conversation = require('../models/Conversation');
 const config = require('../config');
+
+function normalizeMembers(senderId, recipientId) {
+  return [senderId.toString(), recipientId.toString()].sort();
+}
 
 function setupSocket(server) {
   const io = new Server(server, {
@@ -53,6 +58,19 @@ function setupSocket(server) {
           recipient: recipientId,
           content: trimmedContent,
         });
+
+        const members = normalizeMembers(senderId, recipientId);
+        await Conversation.findOneAndUpdate(
+          { members },
+          {
+            $set: {
+              lastMessage: message._id,
+              lastMessageAt: message.sentAt,
+            },
+            $setOnInsert: { members },
+          },
+          { upsert: true }
+        );
 
         const payloadOut = {
           id: message._id,
