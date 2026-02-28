@@ -8,21 +8,52 @@ function normalizeMembers(memberA, memberB) {
 async function listConversations(req, res, next) {
   try {
     const { userId } = req.query;
+    const tokenUserId = req.user && req.user.id;
 
-    if (!userId) {
+    const effectiveUserId = userId || tokenUserId;
+
+    if (!effectiveUserId) {
       return res.status(400).json({ message: 'userId is required' });
     }
 
-    if (!isValidObjectId(userId)) {
+    if (!isValidObjectId(effectiveUserId)) {
       return res.status(400).json({ message: 'Invalid userId' });
     }
 
-    const conversations = await Conversation.find({ members: userId })
+    if (tokenUserId && userId && tokenUserId !== userId) {
+      return res.status(403).json({ message: 'Not allowed to access other users conversations' });
+    }
+
+    const conversations = await Conversation.find({ members: effectiveUserId })
       .sort({ lastMessageAt: -1, updatedAt: -1 })
       .populate('lastMessage')
+      .populate('members', 'name email photo')
       .lean();
 
-    return res.json({ conversations });
+    const formatted = conversations.map((conversation) => {
+      const receiver = (conversation.members || []).find(
+        (member) => member && member._id.toString() !== effectiveUserId.toString()
+      );
+
+      return {
+        _id: conversation._id,
+        lastMessage: conversation.lastMessage,
+        lastMessageAt: conversation.lastMessageAt,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        receiver: receiver
+          ? {
+              id: receiver._id,
+              name: receiver.name,
+              email: receiver.email,
+              photo: receiver.photo,
+            }
+          : null,
+        receiverName: receiver ? receiver.name : null,
+      };
+    });
+
+    return res.json({ conversations: formatted });
   } catch (err) {
     return next(err);
   }
@@ -31,6 +62,7 @@ async function listConversations(req, res, next) {
 async function createConversation(req, res, next) {
   try {
     const { memberA, memberB } = req.body;
+    const tokenUserId = req.user && req.user.id;
 
     if (!memberA || !memberB) {
       return res.status(400).json({ message: 'memberA and memberB are required' });
@@ -42,6 +74,14 @@ async function createConversation(req, res, next) {
 
     if (memberA.toString() === memberB.toString()) {
       return res.status(400).json({ message: 'memberA and memberB must be different' });
+    }
+
+    if (
+      tokenUserId &&
+      tokenUserId !== memberA.toString() &&
+      tokenUserId !== memberB.toString()
+    ) {
+      return res.status(403).json({ message: 'Not allowed to create conversation for other users' });
     }
 
     const members = normalizeMembers(memberA, memberB);

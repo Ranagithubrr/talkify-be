@@ -9,10 +9,12 @@ const swaggerSpec = {
     { url: '/', description: 'Root server' },
     { url: '/api', description: 'API base' },
   ],
+  security: [{ bearerAuth: [] }],
   paths: {
     '/': {
       get: {
         summary: 'Root status',
+        security: [],
         responses: {
           200: { description: 'API is running' },
         },
@@ -21,6 +23,7 @@ const swaggerSpec = {
     '/health': {
       get: {
         summary: 'Health check',
+        security: [],
         responses: {
           200: {
             description: 'Service health',
@@ -39,6 +42,7 @@ const swaggerSpec = {
     '/api/auth/register': {
       post: {
         summary: 'Register a new user',
+        security: [],
         requestBody: {
           required: true,
           content: {
@@ -64,6 +68,7 @@ const swaggerSpec = {
     '/api/auth/login': {
       post: {
         summary: 'Login user',
+        security: [],
         requestBody: {
           required: true,
           content: {
@@ -89,6 +94,7 @@ const swaggerSpec = {
     '/api/auth/refresh': {
       post: {
         summary: 'Refresh access token',
+        security: [],
         requestBody: {
           required: true,
           content: {
@@ -184,12 +190,14 @@ const swaggerSpec = {
     '/api/conversations': {
       get: {
         summary: 'List conversations for a user',
+        security: [{ bearerAuth: [] }],
         parameters: [
           {
             name: 'userId',
             in: 'query',
-            required: true,
+            required: false,
             schema: { type: 'string' },
+            description: 'Defaults to authenticated user when omitted',
           },
         ],
         responses: {
@@ -214,6 +222,7 @@ const swaggerSpec = {
       },
       post: {
         summary: 'Create or get a 1:1 conversation',
+        security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -265,6 +274,13 @@ const swaggerSpec = {
     },
   },
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
     schemas: {
       RegisterRequest: {
         type: 'object',

@@ -24,10 +24,11 @@ function setupSocket(server) {
 
   io.on('connection', (socket) => {
     const { userId } = socket.handshake.query;
-    if (userId && isValidObjectId(userId)) {
-      socket.join(userId);
-      const current = activeCounts.get(userId) || 0;
-      activeCounts.set(userId, current + 1);
+    const socketUserId = userId && isValidObjectId(userId) ? userId : null;
+    if (socketUserId) {
+      socket.join(socketUserId);
+      const current = activeCounts.get(socketUserId) || 0;
+      activeCounts.set(socketUserId, current + 1);
       broadcastActiveUsers();
     }
 
@@ -88,13 +89,66 @@ function setupSocket(server) {
       }
     });
 
+    socket.on('conversations:list', async (payload, ack) => {
+      try {
+        const requestedUserId = payload && payload.userId;
+        const effectiveUserId = requestedUserId || socketUserId;
+
+        if (!effectiveUserId || !isValidObjectId(effectiveUserId)) {
+          const error = 'Valid userId is required';
+          if (ack) ack({ ok: false, error });
+          return;
+        }
+
+        if (socketUserId && requestedUserId && requestedUserId !== socketUserId) {
+          const error = 'Not allowed to access other users conversations';
+          if (ack) ack({ ok: false, error });
+          return;
+        }
+
+        const conversations = await Conversation.find({ members: effectiveUserId })
+          .sort({ lastMessageAt: -1, updatedAt: -1 })
+          .populate('lastMessage')
+          .populate('members', 'name email photo')
+          .lean();
+
+        const formatted = conversations.map((conversation) => {
+          const receiver = (conversation.members || []).find(
+            (member) => member && member._id.toString() !== effectiveUserId.toString()
+          );
+
+          return {
+            _id: conversation._id,
+            lastMessage: conversation.lastMessage,
+            lastMessageAt: conversation.lastMessageAt,
+            createdAt: conversation.createdAt,
+            updatedAt: conversation.updatedAt,
+            receiver: receiver
+              ? {
+                  id: receiver._id,
+                  name: receiver.name,
+                  email: receiver.email,
+                  photo: receiver.photo,
+                }
+              : null,
+            receiverName: receiver ? receiver.name : null,
+          };
+        });
+
+        if (ack) ack({ ok: true, conversations: formatted });
+      } catch (err) {
+        console.error('Socket conversations list error', err);
+        if (ack) ack({ ok: false, error: 'Internal error' });
+      }
+    });
+
     socket.on('disconnect', () => {
-      if (userId && isValidObjectId(userId) && activeCounts.has(userId)) {
-        const next = (activeCounts.get(userId) || 1) - 1;
+      if (socketUserId && activeCounts.has(socketUserId)) {
+        const next = (activeCounts.get(socketUserId) || 1) - 1;
         if (next <= 0) {
-          activeCounts.delete(userId);
+          activeCounts.delete(socketUserId);
         } else {
-          activeCounts.set(userId, next);
+          activeCounts.set(socketUserId, next);
         }
         broadcastActiveUsers();
       }
